@@ -2,41 +2,45 @@ const Product = require("../models/Product");
 const Sale = require("../models/Sale");
 
 exports.recordSale = async (req, res) => {
-  const { items } = req.body;
+  try {
+    const { items } = req.body;
 
-  let totalAmount = 0;
-  let totalProfit = 0;
-  const productsToSave = [];
+    let totalAmount = 0;
+    let totalProfit = 0;
+    const productsToSave = [];
 
-  for (let item of items) {
-    const product = await Product.findById(item.productId);
+    for (let item of items) {
+      const product = await Product.findById(item.productId);
 
-    if (!product || product.quantityInStock < item.quantity)
-      return res.status(400).json({ message: "Insufficient stock" });
+      if (!product || product.quantityInStock < item.quantity)
+        return res.status(400).json({ message: "Insufficient stock" });
 
-    const profit = (product.sellingPrice - product.buyingPrice) * item.quantity;
+      const profit = (product.sellingPrice - product.buyingPrice) * item.quantity;
 
-    totalAmount += product.sellingPrice * item.quantity;
-    totalProfit += profit;
+      totalAmount += product.sellingPrice * item.quantity;
+      totalProfit += profit;
 
-    product.quantityInStock -= item.quantity;
-    await product.save();
+      product.quantityInStock -= item.quantity;
+      await product.save();
 
-    productsToSave.push({
-      product: product._id,
-      quantity: item.quantity,
-      profit: profit,
+      productsToSave.push({
+        product: product._id,
+        quantity: item.quantity,
+        profit: profit,
+      });
+    }
+
+    const sale = await Sale.create({
+      products: productsToSave,
+      totalAmount,
+      totalProfit,
+      cashier: req.user.id,
     });
+
+    res.status(201).json(sale);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
   }
-
-  const sale = await Sale.create({
-    products: productsToSave,
-    totalAmount,
-    totalProfit,
-    cashier: req.user.id,
-  });
-
-  res.status(201).json(sale);
 };
 
 exports.getSales = async (req, res) => {

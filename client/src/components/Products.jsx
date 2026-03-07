@@ -4,25 +4,36 @@ import { getProducts, createProduct, updateProduct, deleteProduct } from "../ser
 export default function Products() {
   const [products, setProducts] = useState([]);
   const [search, setSearch] = useState("");
+  const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(10);
+  const [totalPages, setTotalPages] = useState(1);
   const [form, setForm] = useState({ name: "", category: "", buyingPrice: "", sellingPrice: "", quantityInStock: "" });
   const [editId, setEditId] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  // Load products on mount
+  // Load products on mount and when page/search/limit changes
   useEffect(() => {
     loadProducts();
-  }, []);
+  }, [page, search, limit]);
 
   async function loadProducts() {
     try {
       setLoading(true);
-      const data = await getProducts();
-      if (data.error) {
-        setError(data.message || "Failed to load products");
+      const response = await getProducts(page, limit, search);
+      if (response.error) {
+        setError(response.message || "Failed to load products");
         return;
       }
-      setProducts(data || []);
+      
+      // Handle both old format (array) and new format (object with products)
+      if (Array.isArray(response)) {
+        setProducts(response);
+        setTotalPages(Math.ceil(response.length / limit) || 1);
+      } else {
+        setProducts(response.products || []);
+        setTotalPages(response.totalPages || 1);
+      }
     } catch (err) {
       setError("Error loading products");
       console.error(err);
@@ -30,11 +41,6 @@ export default function Products() {
       setLoading(false);
     }
   }
-
-  // Filter products by search keyword
-  const filtered = products.filter((p) =>
-    p.name.toLowerCase().includes(search.toLowerCase())
-  );
 
   function handleFormChange(e) {
     setForm({ ...form, [e.target.name]: e.target.value });
@@ -59,6 +65,7 @@ export default function Products() {
           return;
         }
       }
+      setPage(1); // Reset to first page
       await loadProducts();
       resetForm();
     } catch (err) {
@@ -86,6 +93,7 @@ export default function Products() {
         setError(result.message);
         return;
       }
+      setPage(1); // Reset to first page
       await loadProducts();
     } catch (err) {
       setError("Delete failed");
@@ -158,7 +166,10 @@ export default function Products() {
             type="text"
             placeholder="🔍 Search products..."
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(e) => {
+              setSearch(e.target.value);
+              setPage(1); // Reset to first page on search
+            }}
             className="w-full border border-slate-200  px-3 py-2 text-sm mb-4 focus:outline-none focus:ring-2 focus:ring-blue-400"
           />
 
@@ -176,8 +187,8 @@ export default function Products() {
                 </tr>
               </thead>
               <tbody>
-                {filtered.map((p) => (
-                  <tr key={p.id} className="border-t border-slate-100 hover:bg-slate-50">
+                {products.map((p) => (
+                  <tr key={p._id} className="border-t border-slate-100 hover:bg-slate-50">
                     <td className="px-3 py-2 font-medium">{p.name}</td>
                     <td className="px-3 py-2 text-slate-500">{p.category}</td>
                     <td className="px-3 py-2">{p.buyingPrice}</td>
@@ -194,11 +205,52 @@ export default function Products() {
                     </td>
                   </tr>
                 ))}
-                {filtered.length === 0 && (
+                {products.length === 0 && (
                   <tr><td colSpan={6} className="text-center text-slate-400 py-6">No products found.</td></tr>
                 )}
               </tbody>
             </table>
+          </div>
+
+          {/* Pagination Controls */}
+          <div className="flex items-center justify-between mt-4 pt-4 border-t border-slate-200">
+            <div className="flex items-center gap-2">
+              <label className="text-sm text-slate-600">Items per page:</label>
+              <select
+                value={limit}
+                onChange={(e) => {
+                  setLimit(Number(e.target.value));
+                  setPage(1);
+                }}
+                className="px-3 py-1.5 text-sm border border-slate-200 rounded hover:border-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-400"
+              >
+                <option value={5}>5</option>
+                <option value={10}>10</option>
+                <option value={20}>20</option>
+                <option value={50}>50</option>
+              </select>
+            </div>
+
+            <div className="text-sm text-slate-600">
+              Page <span className="font-semibold">{page}</span> of <span className="font-semibold">{totalPages}</span>
+            </div>
+
+            <div className="flex gap-2">
+              <button
+                onClick={() => setPage(Math.max(1, page - 1))}
+                disabled={page === 1}
+                className="px-3 py-1.5 text-sm border border-slate-200 rounded hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition"
+              >
+                ← Previous
+              </button>
+              <button
+                onClick={() => setPage(Math.min(totalPages, page + 1))}
+                disabled={page >= totalPages}
+                className="px-3 py-1.5 text-sm border border-slate-200 rounded hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition"
+              >
+                Next →
+              </button>
+            </div>
           </div>
         </div>
       </div>

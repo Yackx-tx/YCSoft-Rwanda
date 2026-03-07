@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { Routes, Route, Navigate } from "react-router-dom";
 import { AuthContext } from "./components/Context/AuthContext";
 import Login from "./components/auth/Login.jsx";
 import Register from "./components/auth/Register.jsx";
@@ -7,12 +8,11 @@ import Dashboard from "./components/Dashboard.jsx";
 import Products from "./components/Products.jsx";
 import Sales from "./components/Sales.jsx";
 import Report from "./components/Report.jsx";
+import ProtectedRoute from "./components/ProtectedRoute.jsx";
 
 export default function App() {
   const [user, setUser] = useState(null); 
-  const [page, setPage] = useState(null); 
   const [loading, setLoading] = useState(true);
-  const [showRegister, setShowRegister] = useState(false);
 
   // Check for stored user/token on mount
   useEffect(() => {
@@ -21,7 +21,6 @@ export default function App() {
       try {
         const userData = JSON.parse(storedUser);
         setUser(userData);
-        setPage(userData.role === "Admin" ? "dashboard" : "sales");
       } catch (err) {
         localStorage.removeItem("user");
         localStorage.removeItem("token");
@@ -30,15 +29,13 @@ export default function App() {
     setLoading(false);
   }, []);
 
-  // When user logs in, set user and redirect to their default page
+  // When user logs in
   function handleLogin(loggedInUser) {
     setUser(loggedInUser);
-    setPage(loggedInUser.role === "Admin" ? "dashboard" : "sales");
   }
 
   function handleLogout() {
     setUser(null);
-    setPage(null);
     localStorage.removeItem("token");
     localStorage.removeItem("user");
   }
@@ -48,31 +45,36 @@ export default function App() {
 
   // No user = show login or register
   if (!user) {
-    if (showRegister) {
-      return <Register onLogin={handleLogin} onSwitch={() => setShowRegister(false)} />;
-    }
-    return <Login onLogin={handleLogin} onSwitch={() => setShowRegister(true)} />;
+    return (
+      <Routes>
+        <Route path="/login" element={<Login onLogin={handleLogin} />} />
+        <Route path="/register" element={<Register onLogin={handleLogin} />} />
+        <Route path="*" element={<Navigate to="/login" replace />} />
+      </Routes>
+    );
   }
 
-  // Render current page
-  function renderPage() {
-    // Protect admin-only pages
-    if ((page === "dashboard" || page === "products") && user.role !== "Admin") {
-      return <div className="p-8 text-red-500 font-semibold">Access Denied — Admins only.</div>;
-    }
-    if (page === "dashboard") return <Dashboard />;
-    if (page === "products")  return <Products />;
-    if (page === "sales")     return <Sales />;
-    if (page === "report")    return <Report />;
-    return <div className="p-8 text-slate-400">Select a page from the navbar.</div>;
-  }
+  // User is logged in - show full app with protected routes
+  const defaultPath = user.role === "Admin" ? "/dashboard" : "/sales";
 
   return (
-    // Provide user context globally
     <AuthContext.Provider value={user}>
       <div className="min-h-screen bg-slate-100">
-        <Navbar user={user} onLogout={handleLogout} page={page} setPage={setPage} />
-        <main>{renderPage()}</main>
+        <Navbar user={user} onLogout={handleLogout} />
+        <main>
+          <Routes>
+            {/* Admin-only routes */}
+            <Route path="/dashboard" element={<ProtectedRoute role="Admin"><Dashboard /></ProtectedRoute>} />
+            <Route path="/products" element={<ProtectedRoute role="Admin"><Products /></ProtectedRoute>} />
+            
+            {/* Public routes for authenticated users */}
+            <Route path="/sales" element={<Sales />} />
+            <Route path="/report" element={<Report />} />
+            
+            {/* Default redirect */}
+            <Route path="*" element={<Navigate to={defaultPath} replace />} />
+          </Routes>
+        </main>
       </div>
     </AuthContext.Provider>
   );

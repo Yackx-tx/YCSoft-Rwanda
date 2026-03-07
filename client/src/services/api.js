@@ -1,4 +1,4 @@
-const API_BASE = "http://localhost:8000/api";
+const API_BASE = "http://localhost:2000/api";
 
 // Helper to get auth headers
 export function authHeader() {
@@ -38,9 +38,14 @@ export async function createProduct(productData) {
   return res.json();
 }
 
-// Get all products
-export async function getProducts() {
-  const res = await fetch(`${API_BASE}/products`, {
+// Get all products (with pagination and search)
+export async function getProducts(page = 1, limit = 10, search = "") {
+  const params = new URLSearchParams({
+    page,
+    limit,
+    search,
+  });
+  const res = await fetch(`${API_BASE}/products?${params}`, {
     method: "GET",
     headers: authHeader(),
   });

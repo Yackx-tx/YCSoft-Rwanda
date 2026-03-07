@@ -7,20 +7,31 @@ export default function Sales() {
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(10);
+  const [totalPages, setTotalPages] = useState(1);
 
-  // Load products on mount
+  // Load products on mount and when page/limit changes
   useEffect(() => {
     loadProducts();
-  }, []);
+  }, [page, limit]);
 
   async function loadProducts() {
     try {
-      const data = await getProducts();
-      if (data.error) {
-        setError(data.message || "Failed to load products");
+      const response = await getProducts(page, limit, "");
+      if (response.error) {
+        setError(response.message || "Failed to load products");
         return;
       }
-      setProducts(data || []);
+      
+      // Handle both old format (array) and new format (object with products)
+      if (Array.isArray(response)) {
+        setProducts(response);
+        setTotalPages(Math.ceil(response.length / limit) || 1);
+      } else {
+        setProducts(response.products || []);
+        setTotalPages(response.totalPages || 1);
+      }
     } catch (err) {
       setError("Error loading products");
       console.error(err);
@@ -66,6 +77,7 @@ export default function Sales() {
       
       setCart({});     // clear cart
       setSuccess(true);
+      setPage(1);      // reset to first page
       await loadProducts(); // refresh product list
       setTimeout(() => setSuccess(false), 3000); // hide after 3s
     } catch (err) {
@@ -123,6 +135,47 @@ export default function Sales() {
                 </div>
               </div>
             ))}
+          </div>
+
+          {/* Pagination Controls */}
+          <div className="flex items-center justify-between mt-6 pt-4 border-t border-slate-200">
+            <div className="flex items-center gap-2">
+              <label className="text-sm text-slate-600">Items per page:</label>
+              <select
+                value={limit}
+                onChange={(e) => {
+                  setLimit(Number(e.target.value));
+                  setPage(1);
+                }}
+                className="px-3 py-1.5 text-sm border border-slate-200 rounded hover:border-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-400"
+              >
+                <option value={5}>5</option>
+                <option value={10}>10</option>
+                <option value={20}>20</option>
+                <option value={50}>50</option>
+              </select>
+            </div>
+
+            <div className="text-sm text-slate-600">
+              Page <span className="font-semibold">{page}</span> of <span className="font-semibold">{totalPages}</span>
+            </div>
+
+            <div className="flex gap-2">
+              <button
+                onClick={() => setPage(Math.max(1, page - 1))}
+                disabled={page === 1}
+                className="px-3 py-1.5 text-sm border border-slate-200 rounded hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition"
+              >
+                ← Previous
+              </button>
+              <button
+                onClick={() => setPage(Math.min(totalPages, page + 1))}
+                disabled={page >= totalPages}
+                className="px-3 py-1.5 text-sm border border-slate-200 rounded hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition"
+              >
+                Next →
+              </button>
+            </div>
           </div>
         </div>
 

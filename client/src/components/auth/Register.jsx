@@ -1,6 +1,8 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 
-export default function Register({ onLogin, onSwitch }) {
+export default function Register({ onLogin }) {
+  const navigate = useNavigate();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -25,6 +27,10 @@ export default function Register({ onLogin, onSwitch }) {
       localStorage.setItem("token", data.token);
       localStorage.setItem("user", JSON.stringify(data.user));
       onLogin(data.user);
+      
+      // Navigate to appropriate page after registration
+      const defaultPath = data.user.role === "Admin" ? "/dashboard" : "/sales";
+      navigate(defaultPath);
     } catch (err) {
       setError("Server error. Please try again.");
       console.error("Register error:", err);
@@ -105,7 +111,7 @@ export default function Register({ onLogin, onSwitch }) {
 
         <p className="text-sm text-slate-500 mt-6 text-center">
           Already have an account?{" "}
-          <button onClick={onSwitch} className="text-blue-600 hover:underline font-medium focus:outline-none">
+          <button onClick={() => navigate("/login")} className="text-blue-600 hover:underline font-medium focus:outline-none">
             Sign In
           </button>
         </p>
